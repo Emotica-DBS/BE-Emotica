@@ -1,12 +1,12 @@
 # =================================================================
 # BAGIAN 1: IMPOR SEMUA PERALATAN DAPUR YANG DIBUTUHKAN
 # =================================================================
-import os 
+import os
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
-from bson.objectid import ObjectId # Untuk berinteraksi dengan ID unik MongoDB
-from functools import wraps # Untuk membuat decorator token
+from bson.objectid import ObjectId
+from functools import wraps
 import bcrypt 
 import jwt    
 from datetime import datetime, timedelta
@@ -16,44 +16,66 @@ import joblib
 import numpy as np
 import warnings
 
-# Mengabaikan UserWarning dari Keras yang tidak relevan
+# Mengabaikan beberapa pesan peringatan yang tidak krusial dari Keras & TensorFlow
 warnings.filterwarnings("ignore", category=UserWarning, module='keras')
-
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Menyembunyikan pesan info TensorFlow
 
 # =================================================================
 # BAGIAN 2: INISIALISASI DAN KONFIGURASI APLIKASI
 # =================================================================
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": "*"}})
+# [UNTUK DEPLOYMENT] Mengatur CORS agar lebih aman di produksi
+CORS(app, resources={r"/api/*": {"origins": "*"}}) 
 
-# Mengambil konfigurasi dari Environment Variables Render
+# [UNTUK DEPLOYMENT] Mengambil konfigurasi dari Environment Variables
+# Di lokal, Anda bisa membuat file .env atau mengaturnya secara manual
+# Di Railway, kita akan memasukkan ini di tab "Variables"
 MONGO_URI = os.environ.get('MONGO_URI')
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
-# Kunci rahasia untuk JWT. Di aplikasi nyata, ini harus sangat rahasia.
-app.config['SECRET_KEY'] = 'kunci-rahasia-super-aman-yang-tidak-boleh-ada-disini'
+# Fallback untuk pengembangan lokal jika environment variable tidak diatur
+if not MONGO_URI:
+    MONGO_URI = "mongodb+srv://ErliandikaSyahputra:syahputra2710@emoticacluster.iecl2wu.mongodb.net/?retryWrites=true&w=majority&appName=EmoticaCluster"
+if not SECRET_KEY:
+    SECRET_KEY = 'kunci-rahasia-lokal-yang-tetap-harus-diamankan'
+
+app.config['SECRET_KEY'] = SECRET_KEY
+
+# Koneksi ke Database
+try:
+    client = MongoClient(MONGO_URI)
+    db = client['emotica_db']
+    print(">>> Koneksi ke MongoDB berhasil! <<<")
+except Exception as e:
+    print(f">>> GAGAL KONEKSI KE MONGODB: {e} <<<")
+    db = None
 
 
 # =================================================================
 # BAGIAN 3: MEMUAT MODEL MACHINE LEARNING (SEKALI SAJA)
 # =================================================================
+model = None
+tokenizer = None
+label_encoder = None
 try:
-    model = tf.keras.models.load_model('models/best_sentiment_model.keras')
-    tokenizer = BertTokenizer.from_pretrained('models/tokenizer')
-    label_encoder = joblib.load('models/label_encoder.joblib')
+    # Memastikan path relatif terhadap lokasi app.py
+    model_path = os.path.join(os.path.dirname(__file__), 'models', 'best_sentiment_model.keras')
+    tokenizer_path = os.path.join(os.path.dirname(__file__), 'models', 'tokenizer')
+    encoder_path = os.path.join(os.path.dirname(__file__), 'models', 'label_encoder.joblib')
+    
+    model = tf.keras.models.load_model(model_path)
+    tokenizer = BertTokenizer.from_pretrained(tokenizer_path)
+    label_encoder = joblib.load(encoder_path)
     print(">>> Model, Tokenizer, dan Label Encoder berhasil dimuat! <<<")
 except Exception as e:
     print(f">>> TERJADI ERROR SAAT MEMUAT MODEL: {e} <<<")
-    model = None
-
-
+    
 # =================================================================
-# BAGIAN 4: FUNGSI BANTUAN & DECORATOR
+# BAGIAN 4: FUNGSI BANTUAN & DECORATOR ("Penjaga Pintu")
 # =================================================================
 
-# Fungsi untuk prediksi sentimen
 def predict_sentiment(text):
-    if not model:
+    if not all([model, tokenizer, label_encoder]):
         return "Model tidak siap", 0.0
 
     cleaned_text = text.lower()
@@ -65,7 +87,7 @@ def predict_sentiment(text):
         "attention_mask": inputs["attention_mask"],
     }
 
-    predictions = model.predict(input_dict)
+    predictions = model.predict(input_dict, verbose=0) # verbose=0 untuk menyembunyikan progress bar
     
     predicted_class_index = np.argmax(predictions, axis=1)[0]
     predicted_class_label = label_encoder.inverse_transform([predicted_class_index])[0]
@@ -73,12 +95,11 @@ def predict_sentiment(text):
     
     return predicted_class_label, confidence
 
-# Decorator untuk melindungi endpoint yang butuh login
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         token = None
-        if 'Authorization' in request.headers:
+        if 'Authorization' in request.headers and request.headers['Authorization'].startswith('Bearer '):
             token = request.headers['Authorization'].split(" ")[1]
         
         if not token:
@@ -86,7 +107,6 @@ def token_required(f):
         
         try:
             data = jwt.decode(token, app.config['SECRET_KEY'], algorithms=["HS256"])
-            # Cari pengguna berdasarkan ObjectId yang benar
             current_user = db.users.find_one({'_id': ObjectId(data['user_id'])})
             if not current_user:
                  return jsonify({'message': 'User tidak ditemukan!'}), 401
@@ -101,15 +121,12 @@ def token_required(f):
 # BAGIAN 5: API ENDPOINTS (PINTU-PINTU LAYANAN)
 # =================================================================
 
-# Pintu utama untuk tes server
 @app.route('/')
 def index():
     return "<h1>Backend Emotica Berhasil Berjalan!</h1>"
 
-# Pintu untuk registrasi
 @app.route('/api/auth/register', methods=['POST'])
 def register():
-    # ... (kode ini sudah benar, tidak perlu diubah)
     data = request.get_json()
     name = data.get('name')
     email = data.get('email')
@@ -120,10 +137,8 @@ def register():
     db.users.insert_one({'name': name, 'email': email, 'password': hashed_password, 'createdAt': datetime.utcnow()})
     return jsonify({'message': 'Registrasi berhasil!'}), 201
 
-# Pintu untuk login
 @app.route('/api/auth/login', methods=['POST'])
 def login():
-    # ... (kode ini sudah benar, tidak perlu diubah)
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
@@ -133,20 +148,17 @@ def login():
     token = jwt.encode({'user_id': str(user['_id']),'exp': datetime.utcnow() + timedelta(hours=24)}, app.config['SECRET_KEY'], algorithm="HS256")
     return jsonify({'message': 'Login berhasil!','token': token,'user': { 'id': str(user['_id']), 'name': user['name'], 'email': user['email'] }}), 200
 
-# [ENDPOINT BARU] Pintu untuk analisis sentimen
 @app.route('/api/analyze', methods=['POST'])
-@token_required # Lindungi pintu ini dengan "penjaga"
+@token_required
 def analyze_text(current_user):
     data = request.get_json()
     text_to_analyze = data.get('text')
-
     if not text_to_analyze:
         return jsonify({"message": "Teks tidak boleh kosong"}), 400
 
-    # Panggil fungsi prediksi yang sudah kita buat
     sentiment, confidence = predict_sentiment(text_to_analyze)
 
-    # Simpan hasil analisis ke database
+    # Simpan ke database
     db.analyses.insert_one({
         'user_id': current_user['_id'],
         'text': text_to_analyze,
@@ -154,15 +166,10 @@ def analyze_text(current_user):
         'confidence': confidence,
         'createdAt': datetime.utcnow()
     })
-
-    return jsonify({
-        'sentiment': {'type': sentiment.lower(), 'score': confidence}, # Mengembalikan 'positive' atau 'negative'
-    }), 200
+    return jsonify({'sentiment': {'type': sentiment.lower(), 'score': confidence}}), 200
 
 # =================================================================
-# BAGIAN 6: MENJALANKAN SERVER
+# BAGIAN 6: MENJALANKAN SERVER (HANYA UNTUK LOKAL)
 # =================================================================
 if __name__ == '__main__':
-    # Menjalankan server Flask tanpa tes internal lagi
     app.run(debug=True, port=5001)
-
