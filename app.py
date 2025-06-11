@@ -134,7 +134,7 @@ def login():
     user = db.users.find_one({'email': email})
     if not user or not bcrypt.checkpw(password.encode('utf-8'), user['password']):
         return jsonify({'message': 'Email atau kata sandi salah'}), 401
-    token = jwt.encode({'user_id': str(user['_id']),'exp': datetime.utcnow() + timedelta(hours=24)}, app.config['SECRET_KEY'], algorithm="HS256")
+    token = jwt.encode({'user_id': str(user['_id']),'exp': datetime.utcnow() + timedelta(minutes=30)}, app.config['SECRET_KEY'], algorithm="HS256")
     return jsonify({'message': 'Login berhasil!','token': token,'user': { 'id': str(user['_id']), 'name': user['name'], 'email': user['email'] }}), 200
 
 @app.route('/api/analyze', methods=['POST'])
