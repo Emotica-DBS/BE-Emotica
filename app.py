@@ -1,6 +1,7 @@
 # =================================================================
 # BAGIAN 1: IMPOR SEMUA PERALATAN DAPUR YANG DIBUTUHKAN
 # =================================================================
+import os 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from pymongo import MongoClient
@@ -25,10 +26,9 @@ warnings.filterwarnings("ignore", category=UserWarning, module='keras')
 app = Flask(__name__)
 CORS(app, resources={r"/api/*": {"origins": "*"}})
 
-# Ganti dengan connection string MongoDB Atlas Anda yang sudah lengkap
-MONGO_URI = "mongodb+srv://ErliandikaSyahputra:syahputra2710@emoticacluster.iecl2wu.mongodb.net/?retryWrites=true&w=majority&appName=EmoticaCluster"
-client = MongoClient(MONGO_URI)
-db = client['emotica_db']
+# Mengambil konfigurasi dari Environment Variables Render
+MONGO_URI = os.environ.get('MONGO_URI')
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY')
 
 # Kunci rahasia untuk JWT. Di aplikasi nyata, ini harus sangat rahasia.
 app.config['SECRET_KEY'] = 'kunci-rahasia-super-aman-yang-tidak-boleh-ada-disini'
