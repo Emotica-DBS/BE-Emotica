@@ -11,7 +11,7 @@ PyJWT
 # Machine Learning & NLP
 tensorflow
 transformers
-scikit-learn
+scikit-learn==1.4.2
 joblib
 nltk
 Sastrawi

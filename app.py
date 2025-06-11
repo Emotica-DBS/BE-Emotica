@@ -34,7 +34,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 if not MONGO_URI:
     MONGO_URI = "mongodb+srv://ErliandikaSyahputra:syahputra2710@emoticacluster.iecl2wu.mongodb.net/?retryWrites=true&w=majority&appName=EmoticaCluster"
 if not SECRET_KEY:
-    SECRET_KEY = 'kunci-rahasia-super-aman-yang-tidak-boleh-ada-disini'
+    SECRET_KEY = 'emoticadbs'
 
 app.config['SECRET_KEY'] = SECRET_KEY
 
@@ -150,6 +150,30 @@ def analyze_text(current_user):
     db.analyses.insert_one({'user_id': current_user['_id'], 'text': text_to_analyze, 'sentiment': sentiment, 'confidence': confidence, 'createdAt': datetime.utcnow()})
     return jsonify({'sentiment': {'type': sentiment.lower(), 'score': confidence}}), 200
 
+# Endpoint BARU untuk mengambil riwayat berdasarkan user_id dari token
+@app.route('/api/history', methods=['GET'])
+@token_required
+def get_user_history(current_user):
+    try:
+        # Cari semua analisis milik user yang sedang login, urutkan dari yang terbaru
+        user_analyses = db.analyses.find(
+            {'user_id': current_user['_id']}
+        ).sort('createdAt', -1)
+        
+        # Konversi data ke format JSON yang bisa dikirim
+        history_list = []
+        for analysis in user_analyses:
+            analysis['_id'] = str(analysis['_id'])
+            analysis['user_id'] = str(analysis['user_id'])
+            # Ubah objek datetime ke string ISO agar mudah dibaca JavaScript
+            analysis['createdAt'] = analysis['createdAt'].isoformat()
+            history_list.append(analysis)
+            
+        return jsonify(history_list), 200
+        
+    except Exception as e:
+        return jsonify({'message': 'Gagal mengambil riwayat', 'error': str(e)}), 500
+    
 # =================================================================
 # BAGIAN 6: MENJALANKAN SERVER (HANYA UNTUK LOKAL)
 # =================================================================
