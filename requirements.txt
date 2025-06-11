@@ -7,7 +7,6 @@ gunicorn
 pymongo
 bcrypt
 PyJWT
-bson
 
 # Machine Learning & NLP
 tensorflow
