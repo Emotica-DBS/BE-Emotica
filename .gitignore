@@ -1,33 +1,5 @@
 # ========================
-# Python
-# ========================
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-
-# ========================
-# Build
-# ========================
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# ========================
-# Virtual Environment
+# Python Virtual Environment
 # ========================
 venv/
 ENV/
@@ -36,44 +8,26 @@ env/
 .venv/
 
 # ========================
+# Python Cache & Compiled Files
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# ========================
 # IDEs & Editors
 # ========================
 .idea/
 .vscode/
 *.swp
 *.swo
-.project
-.pydevproject
-.settings
 
 # ========================
-# Logs & Caches
-# ========================
-*.log
-logs/
-.webassets-cache
-
-# ========================
-# Local Settings
-# ========================
-instance/
-.env.local
-.env.*.local
-
-# ========================
-# Models & Data (placeholder only)
-# ========================
-/models/*
-!/models/.gitkeep
-/data/*
-!/data/.gitkeep
-
-# ========================
-# Databases
+# Databases (jika ada di lokal)
 # ========================
 *.sqlite
 *.db
-*.rdb
 
 # ========================
 # System Files
