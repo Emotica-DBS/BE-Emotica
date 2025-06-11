@@ -1,9 +1,15 @@
+# ========================
 # Python
+# ========================
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
+
+# ========================
+# Build
+# ========================
 build/
 develop-eggs/
 dist/
@@ -20,14 +26,18 @@ wheels/
 .installed.cfg
 *.egg
 
+# ========================
 # Virtual Environment
+# ========================
 venv/
 ENV/
 env/
 .env
 .venv/
 
-# IDE
+# ========================
+# IDEs & Editors
+# ========================
 .idea/
 .vscode/
 *.swp
@@ -36,27 +46,37 @@ env/
 .pydevproject
 .settings
 
-# Logs
+# ========================
+# Logs & Caches
+# ========================
 *.log
 logs/
-
-# Local development settings
-instance/
 .webassets-cache
+
+# ========================
+# Local Settings
+# ========================
+instance/
 .env.local
 .env.*.local
 
-# Machine Learning models and data
+# ========================
+# Models & Data (placeholder only)
+# ========================
 /models/*
 !/models/.gitkeep
 /data/*
 !/data/.gitkeep
 
-# Database
+# ========================
+# Databases
+# ========================
 *.sqlite
 *.db
 *.rdb
 
+# ========================
 # System Files
+# ========================
 .DS_Store
 Thumbs.db
