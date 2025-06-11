@@ -16,20 +16,17 @@ import joblib
 import numpy as np
 import warnings
 
-# Mengabaikan beberapa pesan peringatan yang tidak krusial dari Keras & TensorFlow
+# Mengabaikan beberapa pesan peringatan yang tidak krusial
 warnings.filterwarnings("ignore", category=UserWarning, module='keras')
-os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2' # Menyembunyikan pesan info TensorFlow
+os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 # =================================================================
 # BAGIAN 2: INISIALISASI DAN KONFIGURASI APLIKASI
 # =================================================================
 app = Flask(__name__)
-# [UNTUK DEPLOYMENT] Mengatur CORS agar lebih aman di produksi
 CORS(app, resources={r"/api/*": {"origins": "*"}}) 
 
-# [UNTUK DEPLOYMENT] Mengambil konfigurasi dari Environment Variables
-# Di lokal, Anda bisa membuat file .env atau mengaturnya secara manual
-# Di Railway, kita akan memasukkan ini di tab "Variables"
+# [UNTUK DEPLOYMENT] Mengambil konfigurasi dari Environment Variables di server Railway
 MONGO_URI = os.environ.get('MONGO_URI')
 SECRET_KEY = os.environ.get('SECRET_KEY')
 
@@ -37,7 +34,7 @@ SECRET_KEY = os.environ.get('SECRET_KEY')
 if not MONGO_URI:
     MONGO_URI = "mongodb+srv://ErliandikaSyahputra:syahputra2710@emoticacluster.iecl2wu.mongodb.net/?retryWrites=true&w=majority&appName=EmoticaCluster"
 if not SECRET_KEY:
-    SECRET_KEY = 'kunci-rahasia-lokal-yang-tetap-harus-diamankan'
+    SECRET_KEY = 'kunci-rahasia-super-aman-yang-tidak-boleh-ada-disini'
 
 app.config['SECRET_KEY'] = SECRET_KEY
 
@@ -50,15 +47,11 @@ except Exception as e:
     print(f">>> GAGAL KONEKSI KE MONGODB: {e} <<<")
     db = None
 
-
 # =================================================================
 # BAGIAN 3: MEMUAT MODEL MACHINE LEARNING (SEKALI SAJA)
 # =================================================================
 model = None
-tokenizer = None
-label_encoder = None
 try:
-    # Memastikan path relatif terhadap lokasi app.py
     model_path = os.path.join(os.path.dirname(__file__), 'models', 'best_sentiment_model.keras')
     tokenizer_path = os.path.join(os.path.dirname(__file__), 'models', 'tokenizer')
     encoder_path = os.path.join(os.path.dirname(__file__), 'models', 'label_encoder.joblib')
@@ -87,7 +80,7 @@ def predict_sentiment(text):
         "attention_mask": inputs["attention_mask"],
     }
 
-    predictions = model.predict(input_dict, verbose=0) # verbose=0 untuk menyembunyikan progress bar
+    predictions = model.predict(input_dict, verbose=0)
     
     predicted_class_index = np.argmax(predictions, axis=1)[0]
     predicted_class_label = label_encoder.inverse_transform([predicted_class_index])[0]
@@ -116,7 +109,6 @@ def token_required(f):
         return f(current_user, *args, **kwargs)
     return decorated
 
-
 # =================================================================
 # BAGIAN 5: API ENDPOINTS (PINTU-PINTU LAYANAN)
 # =================================================================
@@ -128,10 +120,8 @@ def index():
 @app.route('/api/auth/register', methods=['POST'])
 def register():
     data = request.get_json()
-    name = data.get('name')
-    email = data.get('email')
-    password = data.get('password')
-    if not name or not email or not password: return jsonify({'message': 'Mohon isi semua kolom'}), 400
+    name, email, password = data.get('name'), data.get('email'), data.get('password')
+    if not all([name, email, password]): return jsonify({'message': 'Mohon isi semua kolom'}), 400
     if db.users.find_one({'email': email}): return jsonify({'message': 'Email sudah terdaftar'}), 409
     hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
     db.users.insert_one({'name': name, 'email': email, 'password': hashed_password, 'createdAt': datetime.utcnow()})
@@ -140,8 +130,7 @@ def register():
 @app.route('/api/auth/login', methods=['POST'])
 def login():
     data = request.get_json()
-    email = data.get('email')
-    password = data.get('password')
+    email, password = data.get('email'), data.get('password')
     user = db.users.find_one({'email': email})
     if not user or not bcrypt.checkpw(password.encode('utf-8'), user['password']):
         return jsonify({'message': 'Email atau kata sandi salah'}), 401
@@ -157,19 +146,12 @@ def analyze_text(current_user):
         return jsonify({"message": "Teks tidak boleh kosong"}), 400
 
     sentiment, confidence = predict_sentiment(text_to_analyze)
-
-    # Simpan ke database
-    db.analyses.insert_one({
-        'user_id': current_user['_id'],
-        'text': text_to_analyze,
-        'sentiment': sentiment,
-        'confidence': confidence,
-        'createdAt': datetime.utcnow()
-    })
+    
+    db.analyses.insert_one({'user_id': current_user['_id'], 'text': text_to_analyze, 'sentiment': sentiment, 'confidence': confidence, 'createdAt': datetime.utcnow()})
     return jsonify({'sentiment': {'type': sentiment.lower(), 'score': confidence}}), 200
 
 # =================================================================
 # BAGIAN 6: MENJALANKAN SERVER (HANYA UNTUK LOKAL)
 # =================================================================
 if __name__ == '__main__':
-    app.run(debug=True, port=5001)
+    app.run(debug=False, host='0.0.0.0', port=int(os.environ.get('PORT', 5001)))
